@@ -222,7 +222,7 @@
       document.getElementById('loading').classList.add('hidden');
     }
 
-    // GASバックエンドへの通信関数（診断・エラー詳細表示 ＆ 実績仕様）
+    // GASバックエンドへの安全通信関数（実績完全準拠 ＆ ワンタップ原因診断機能版）
     async function callGasBackend(action, payload = {}) {
       const bodyData = {
         action: action,
@@ -247,12 +247,11 @@
         try {
           return JSON.parse(text);
         } catch (jsonErr) {
-          throw new Error(`[JSON解析失敗] サーバーからの返答がJSONではありません:\n${text.substring(0, 150)}`);
+          throw new Error(`[JSON解析失敗] サーバーからの返答がJSONではありません:\n${text.substring(0, 200)}`);
         }
       } catch (netErr) {
-        // 通信遮断の詳細をログとエラーメッセージに集約
         console.error('Fetch Fatal Error:', netErr);
-        throw new Error(`${netErr.message}\n\n【接続先URL】\n${gasBackendUrl}`);
+        throw new Error(`${netErr.message}\n\n【接続先GAS URL】\n${gasBackendUrl}`);
       }
     }
 
@@ -268,8 +267,55 @@
         renderTaskUI(res.data);
       } catch (err) {
         hideLoading();
-        alert('【通信エラー詳細】\n' + err.message);
+        showDiagnosticErrorModal(err.message);
       }
+    }
+
+    // 🔍 原因特定診断モーダル表示関数
+    function showDiagnosticErrorModal(errorDetail) {
+      // 既存のエラー表示モーダルがあれば削除
+      const existingModal = document.getElementById('diagnostic-error-modal');
+      if (existingModal) existingModal.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'diagnostic-error-modal';
+      modal.className = "fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4";
+      modal.innerHTML = `
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 text-xs animate-in fade-in zoom-in duration-150">
+          <div class="flex items-center space-x-2 border-b border-rose-100 pb-2.5 text-rose-600">
+            <span class="text-xl">⚠️</span>
+            <h3 class="font-black text-sm text-slate-900">通信エラー（原因特定診断）</h3>
+          </div>
+
+          <div class="space-y-2 text-slate-700">
+            <p class="font-bold text-slate-800">サーバー（GAS）との接続に失敗しました。</p>
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-[11px] whitespace-pre-wrap break-all text-slate-600 max-h-36 overflow-y-auto leading-relaxed">${errorDetail}</div>
+          </div>
+
+          <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
+            <div class="font-black text-blue-900 flex items-center space-x-1">
+              <span>🔍</span><span>1秒で原因を白黒判定するテスト</span>
+            </div>
+            <p class="text-[11px] text-blue-800 leading-relaxed">
+              下のボタンをタップして、別タブでGASが直接開くか確認してください：
+            </p>
+            <a href="${gasBackendUrl}" target="_blank" rel="noopener noreferrer" class="block w-full py-2.5 text-center bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg shadow-sm tap-btn transition">
+              🔗 GAS接続先を別タブで直接テスト開く ↗
+            </a>
+            <ul class="text-[10px] text-slate-500 space-y-1 pt-1 list-disc list-inside">
+              <li><strong>Googleログイン画面が出た場合</strong>: GASのアクセス権限が「全員」になっていません。</li>
+              <li><strong>{"success":false...} が出た場合</strong>: 通信は成功しています（再読み込みで開きます）。</li>
+              <li><strong>404エラーが出た場合</strong>: デプロイURLが無効または変更されています。</li>
+            </ul>
+          </div>
+
+          <div class="flex space-x-2 pt-1">
+            <button type="button" onclick="location.reload()" class="w-1/2 py-2.5 rounded-xl bg-slate-900 text-white font-bold tap-btn">再試行（リロード）</button>
+            <button type="button" onclick="document.getElementById('diagnostic-error-modal').remove()" class="w-1/2 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-bold tap-btn">閉じる</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
     }
 
     function renderTaskUI(data) {
