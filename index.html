@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>現場作業コンソール</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .tap-btn:active { transform: scale(0.97); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen pb-20">
+
+  <!-- 📱 現場モバイルヘッダー -->
+  <header class="bg-slate-900 text-white px-4 py-3 sticky top-0 z-40 shadow-md flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <span class="text-xl">🏢</span>
+      <div>
+        <h1 class="text-xs font-black tracking-wider text-slate-200">現場作業コンソール</h1>
+        <p id="header-task-id" class="text-[10px] font-mono text-slate-400">ID: 読込中...</p>
+      </div>
+    </div>
+    <span id="badge-status" class="px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-600 text-white shadow-xs">
+      読込中
+    </span>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="p-4 space-y-4 max-w-lg mx-auto">
+    
+    <!-- 1. 物件・業務概要カード -->
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+      <div class="flex justify-between items-start">
+        <div>
+          <span id="badge-case" class="text-[10px] font-black px-2 py-0.5 rounded bg-blue-100 text-blue-800">--</span>
+          <h2 id="task-prop-name" class="text-base font-black text-slate-900 mt-1">物件名称読込中...</h2>
+        </div>
+      </div>
+      <div class="border-t border-slate-100 pt-2 flex items-center space-x-2 text-xs">
+        <span class="text-slate-500 font-bold shrink-0">点検業務:</span>
+        <span id="task-biz-name" class="font-black text-slate-800">--</span>
+      </div>
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="text-slate-500 font-bold shrink-0">予定日時:</span>
+        <span id="task-plan-dt" class="font-mono font-bold text-blue-700">--</span>
+      </div>
+    </div>
+
+    <!-- 2. 入退館・作業打刻セクション -->
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+      <h3 class="text-xs font-black text-slate-700 flex items-center space-x-1.5">
+        <span>⏱️</span><span>現場作業タイムスタンプ</span>
+      </h3>
+      
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-start-work" onclick="handleStartWork()" class="py-3 px-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md tap-btn transition flex flex-col items-center justify-center space-y-1">
+          <span>▶ 入館・作業開始</span>
+          <span id="stamp-start-time" class="text-[10px] font-mono font-normal opacity-90">未打刻</span>
+        </button>
+
+        <button id="btn-finish-work" onclick="handleFinishWork()" class="py-3 px-2 rounded-xl bg-slate-200 text-slate-400 font-black text-xs tap-btn transition flex flex-col items-center justify-center space-y-1 disabled:cursor-not-allowed" disabled>
+          <span>✓ 退館・作業完了</span>
+          <span id="stamp-finish-time" class="text-[10px] font-mono font-normal opacity-90">未打刻</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. 作業チェック ＆ ログ投稿フォーム -->
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+      <h3 class="text-xs font-black text-slate-700 flex items-center space-x-1.5">
+        <span>📝</span><span>▽何かございましたらログを残せます▽</span>
+      </h3>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">発言者 / 立会担当者名 *</label>
+        <input type="text" id="log-poster" placeholder="例: AFs 山田 / 現場担当" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold bg-slate-50">
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-500 mb-1">クイック作業チェック</label>
+        <div class="flex flex-wrap gap-1.5 text-[11px]">
+          <button type="button" onclick="setQuickMsg('【異常/不具合】')" class="bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg font-bold text-red-600 border border-red-200">
+            異常/不具合
+          </button>
+          <button type="button" onclick="setQuickMsg('【情報共有】')" class="bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-bold text-slate-700 border">
+            情報共有
+          </button>
+          <button type="button" onclick="setQuickMsg('【注意事項】')" class="bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-bold text-slate-700 border">
+            注意事項
+          </button>
+          <button type="button" onclick="setQuickMsg('【メモ/コメント】')" class="bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-bold text-slate-700 border">
+            メモ/コメント
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <textarea id="log-message" rows="2" placeholder="メッセージ入力..." class="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50"></textarea>
+      </div>
+
+      <!-- 写真添付（スマホ標準のカメラが直接起動） -->
+      <div>
+        <label class="block text-[10px] font-bold text-slate-500 mb-1">📷 写真撮影・添付</label>
+        <input type="file" id="log-photo" accept="image/*" capture="environment" onchange="previewPhoto(this)"
+          class="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700">
+        <img id="photo-preview" class="mt-2 rounded-xl max-h-40 w-full object-cover hidden border">
+      </div>
+
+      <div class="p-3 bg-red-50/70 border border-red-200 rounded-xl space-y-1">
+        <label class="flex items-center space-x-2.5 cursor-pointer">
+          <input type="checkbox" id="chk-is-defect" class="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500">
+          <span class="text-xs font-black text-red-700">🚨 不具合・異常として案件管理アプリへ起票する</span>
+        </label>
+        <p class="text-[10px] text-red-600 pl-6.5 leading-tight">チェックを入れると、案件管理アプリへ即座に起票されます。</p>
+      </div>
+
+      <button onclick="submitWorkerLog()" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs shadow-md tap-btn transition flex items-center justify-center space-x-1.5">
+        <span>💬</span><span>ログを送信</span>
+      </button>
+    </div>
+
+    <!-- 4. 現場タイムライン・ログ履歴 -->
+    <div class="space-y-2">
+      <div class="flex justify-between items-center px-1">
+        <h3 class="text-xs font-black text-slate-700 flex items-center space-x-1">
+          <span>📜</span><span>作業共有ログ履歴</span>
+        </h3>
+        <span id="log-count-badge" class="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">0件</span>
+      </div>
+
+      <div id="timeline-container" class="space-y-2">
+        <div class="text-center py-6 text-slate-400 text-xs font-medium">ログを読み込み中...</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ローディング -->
+  <div id="loading" class="fixed inset-0 bg-slate-900/60 z-50 flex flex-col items-center justify-center text-white hidden">
+    <div class="animate-spin rounded-full h-10 w-10 border-4 border-blue-400 border-t-transparent mb-2"></div>
+    <div id="loading-text" class="text-xs font-bold">通信中...</div>
+  </div>
+
+  <!-- 退館モーダル -->
+  <div id="finish-modal" class="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4 hidden backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in duration-150">
+      <div class="flex items-center space-x-3 border-b border-slate-100 pb-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-xl shrink-0">⏱️</div>
+        <div>
+          <h3 class="font-black text-sm text-slate-900">退館・作業終了の記録</h3>
+          <p class="text-[10px] text-slate-500">本日の作業終了ステータスを保存します</p>
+        </div>
+      </div>
+      <div>
+        <label class="block font-bold text-slate-700 text-xs mb-1.5">作業完了・検収メモ（任意）</label>
+        <textarea id="finish-memo-input" rows="3" class="w-full border border-slate-300 rounded-xl p-3 text-xs bg-slate-50 focus:bg-white focus:border-emerald-500 focus:outline-none transition leading-relaxed">全点検作業完了：特に異常ありません。</textarea>
+      </div>
+      <div class="flex space-x-2 pt-1">
+        <button type="button" onclick="closeFinishModal()" class="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs tap-btn transition">戻る</button>
+        <button type="button" onclick="submitFinishWork()" class="w-2/3 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-lg shadow-emerald-600/30 tap-btn transition">✓ 退館を記録する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 作業完了案内モーダル -->
+  <div id="finish-success-modal" class="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4 hidden backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
+      <div class="w-14 h-14 rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner">✓</div>
+      <div class="space-y-1">
+        <h3 class="font-black text-base text-slate-900">お疲れ様でした！</h3>
+        <p class="text-xs text-slate-600 font-bold">現場作業の終了（作業済み）を記録しました。</p>
+        <p class="text-[11px] text-slate-400 pt-1 leading-relaxed">後日、管理ポータルより<br>点検完了報告書（PDF）を提出してください。</p>
+      </div>
+      <button type="button" onclick="closeFinishSuccessModal()" class="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs shadow-md tap-btn transition">確認しました</button>
+    </div>
+  </div>
+
+  <!-- スマホ用トースト通知 -->
+  <div id="worker-toast" class="fixed top-4 left-4 right-4 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none max-w-sm mx-auto">
+    <div id="worker-toast-card" class="bg-slate-900/95 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center space-x-3">
+      <span id="worker-toast-icon" class="text-lg">✓</span>
+      <div class="text-xs font-bold" id="worker-toast-text">メッセージ</div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- JavaScript (GAS バックエンド中継・CORS安全通信) -->
+  <!-- ====================================================================== -->
+  <script>
+    // URLから schedule_id と gasUrl を安全に取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentScheduleId = urlParams.get('schedule_id') || urlParams.get('id') || '';
+    const gasBackendUrl = urlParams.get('gasUrl') || '';
+
+    let taskRecordId = null;
+    let photoBase64 = null;
+    let photoFileName = '';
+    let photoMimeType = '';
+    let currentDefaultPoster = '現場担当者';
+    let isDefectFlag = false;
+
+    window.onload = function() {
+      if (!currentScheduleId) {
+        alert("URLに schedule_id が指定されていません。");
+        return;
+      }
+      if (!gasBackendUrl) {
+        alert("URLに gasUrl（システム接続先）が指定されていません。");
+        return;
+      }
+      document.getElementById('header-task-id').innerText = currentScheduleId;
+      loadTaskData();
+    };
+
+    function showLoading(msg) {
+      document.getElementById('loading-text').innerText = msg || '通信中...';
+      document.getElementById('loading').classList.remove('hidden');
+    }
+    function hideLoading() {
+      document.getElementById('loading').classList.add('hidden');
+    }
+
+    // GASバックエンドへの安全通信共通関数（Content-Type: text/plain でCORS問題を完全回避）
+    async function callGasBackend(action, payload = {}) {
+      const bodyData = {
+        action: action,
+        scheduleId: currentScheduleId,
+        ...payload
+      };
+
+      const res = await fetch(gasBackendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(bodyData)
+      });
+
+      if (!res.ok) {
+        throw new Error(`[HTTP ${res.status}] サーバーとの通信に失敗しました`);
+      }
+      return await res.json();
+    }
+
+    async function loadTaskData() {
+      showLoading('現場データを取得中...');
+      try {
+        const res = await callGasBackend('getWorkerTaskDetails');
+        hideLoading();
+        if (!res.success) {
+          alert('データ取得エラー: ' + res.message);
+          return;
+        }
+        renderTaskUI(res.data);
+      } catch (err) {
+        hideLoading();
+        alert('通信エラー: ' + err.message);
+      }
+    }
+
+    function renderTaskUI(data) {
+      taskRecordId = data.recordId;
+      document.getElementById('task-prop-name').innerText = data.propertyName;
+      document.getElementById('task-biz-name').innerText = data.businessName;
+      document.getElementById('task-plan-dt').innerText = `${data.scheduledDate} ${data.scheduledStartTime ? data.scheduledStartTime + '～' : ''}`;
+      
+      document.getElementById('badge-case').innerText = data.contractCase || 'AFs';
+      document.getElementById('badge-status').innerText = data.workStatus;
+
+      if (data.defaultPoster) {
+        currentDefaultPoster = data.defaultPoster;
+        const posterEl = document.getElementById('log-poster');
+        if (posterEl && !posterEl.value) {
+          posterEl.value = data.defaultPoster;
+        }
+      }
+
+      const btnStart = document.getElementById('btn-start-work');
+      const btnFinish = document.getElementById('btn-finish-work');
+      const stampStart = document.getElementById('stamp-start-time');
+      const stampFinish = document.getElementById('stamp-finish-time');
+
+      if (data.startTime) {
+        stampStart.innerText = new Date(data.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        btnStart.className = "py-3 px-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-default flex flex-col items-center justify-center space-y-1";
+        btnStart.disabled = true;
+        
+        btnFinish.disabled = false;
+        btnFinish.className = "py-3 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md tap-btn transition flex flex-col items-center justify-center space-y-1";
+      }
+
+      if (data.endTime) {
+        stampFinish.innerText = new Date(data.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        btnFinish.className = "py-3 px-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-default flex flex-col items-center justify-center space-y-1";
+        btnFinish.disabled = true;
+      }
+
+      renderTimeline(data.chatLogs);
+    }
+
+    function renderTimeline(logs) {
+      const container = document.getElementById('timeline-container');
+      container.innerHTML = '';
+      document.getElementById('log-count-badge').innerText = `${logs.length}件`;
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div class="bg-white p-6 rounded-2xl border text-center text-slate-400 text-xs">まだ本日のログはありません。<br>作業開始やチェック内容を投稿してください。</div>';
+        return;
+      }
+
+      [...logs].reverse().forEach(log => {
+        const timeStr = log.datetime ? new Date(log.datetime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
+        const card = document.createElement('div');
+        card.className = "bg-white p-3.5 rounded-2xl shadow-xs border border-slate-200 space-y-1.5 text-xs";
+        card.innerHTML = `
+          <div class="flex justify-between items-center border-b border-slate-100 pb-1">
+            <span class="font-black text-slate-800">👤 ${log.poster}</span>
+            <span class="font-mono text-[10px] text-slate-400 font-bold">${timeStr}</span>
+          </div>
+          <div class="text-slate-700 whitespace-pre-wrap leading-relaxed">${log.message}</div>
+          ${log.hasFile ? '<div class="text-[10px] font-bold text-blue-600 flex items-center space-x-1"><span>📷</span><span>写真添付あり</span></div>' : ''}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function setQuickMsg(text) {
+      const textarea = document.getElementById('log-message');
+      textarea.value = textarea.value ? `${textarea.value}\n${text}` : text;
+      if (text.includes('異常') || text.includes('不具合')) {
+        isDefectFlag = true;
+        const chk = document.getElementById('chk-is-defect');
+        if (chk) chk.checked = true;
+      }
+    }
+
+    function previewPhoto(input) {
+      if (input.files && input.files) {
+        const file = input.files;
+        photoFileName = (file.name || 'photo').replace(/\.[^/.]+$/, "") + ".jpg";
+        photoMimeType = "image/jpeg";
+        showLoading('写真を最適化中...');
+
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            hideLoading();
+            const maxDim = 1024;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+            document.getElementById('photo-preview').src = compressedDataUrl;
+            document.getElementById('photo-preview').classList.remove('hidden');
+            photoBase64 = compressedDataUrl.split(',')[1];
+          };
+          img.onerror = () => {
+            hideLoading();
+            alert('写真の読み込みに失敗しました。');
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    async function handleStartWork() {
+      if (!taskRecordId) return showWorkerToast('タスク情報が読み込まれていません', 'error');
+      const poster = document.getElementById('log-poster').value.trim() || currentDefaultPoster;
+      showLoading('作業開始・打刻中...');
+
+      try {
+        const res = await callGasBackend('startWork', {
+          recordId: taskRecordId,
+          poster: poster
+        });
+        hideLoading();
+        if (res.success) {
+          showWorkerToast('⚡ 入館・作業開始を記録しました！', 'success');
+          loadTaskData();
+        } else {
+          showWorkerToast('開始打刻エラー: ' + res.message, 'error');
+        }
+      } catch (err) {
+        hideLoading();
+        showWorkerToast('通信失敗: ' + err.message, 'error');
+      }
+    }
+
+    function handleFinishWork() {
+      if (!taskRecordId) return showWorkerToast('タスク情報が読み込まれていません', 'error');
+      document.getElementById('finish-modal').classList.remove('hidden');
+    }
+    function closeFinishModal() {
+      document.getElementById('finish-modal').classList.add('hidden');
+    }
+
+    async function submitFinishWork() {
+      const memo = document.getElementById('finish-memo-input').value.trim();
+      const poster = document.getElementById('log-poster').value.trim() || currentDefaultPoster;
+      closeFinishModal();
+      showLoading('作業終了・打刻中...');
+
+      try {
+        const res = await callGasBackend('finishWork', {
+          recordId: taskRecordId,
+          memo: memo,
+          poster: poster
+        });
+        hideLoading();
+        if (res.success) {
+          document.getElementById('finish-success-modal').classList.remove('hidden');
+          loadTaskData();
+        } else {
+          showWorkerToast('終了打刻エラー: ' + res.message, 'error');
+        }
+      } catch (err) {
+        hideLoading();
+        showWorkerToast('通信失敗: ' + err.message, 'error');
+      }
+    }
+    function closeFinishSuccessModal() {
+      document.getElementById('finish-success-modal').classList.add('hidden');
+    }
+
+    async function submitWorkerLog() {
+      if (!taskRecordId) return alert('タスクが特定されていません。');
+      const poster = document.getElementById('log-poster').value.trim();
+      const message = document.getElementById('log-message').value.trim();
+
+      if (!poster) return alert('発言者名を入力してください。');
+      if (!message && !photoBase64) return alert('メッセージまたは写真を入力してください。');
+
+      const chkDefect = document.getElementById('chk-is-defect');
+      const isChecked = chkDefect ? chkDefect.checked : false;
+      const hasDefect = isChecked || isDefectFlag || /(異常|不具合|故障|漏水|水漏れ|破損|クラック|ヒビ|サビ|腐食|異音|脱落|危険|修繕)/.test(message);
+
+      showLoading('kintoneへログを記録中...');
+      try {
+        const res = await callGasBackend('postWorkerLog', {
+          recordId: taskRecordId,
+          poster: poster,
+          message: message,
+          base64Photo: photoBase64,
+          fileName: photoFileName,
+          mimeType: photoMimeType,
+          isDefectExplicit: hasDefect
+        });
+
+        hideLoading();
+        if (res.success) {
+          document.getElementById('log-message').value = '';
+          document.getElementById('log-photo').value = '';
+          document.getElementById('photo-preview').classList.add('hidden');
+          photoBase64 = null;
+          isDefectFlag = false;
+          if (chkDefect) chkDefect.checked = false;
+
+          showWorkerToast(res.detectedIssue ? '🚨 不具合を案件管理へ起票・共有しました' : '💬 ログを投稿・共有しました', 'success');
+          loadTaskData();
+        } else {
+          alert('送信失敗: ' + (res.message || '不明なエラー'));
+        }
+      } catch (err) {
+        hideLoading();
+        alert('送信失敗: ' + err.message);
+      }
+    }
+
+    function showWorkerToast(msg, type) {
+      const toast = document.getElementById('worker-toast');
+      const icon = document.getElementById('worker-toast-icon');
+      const text = document.getElementById('worker-toast-text');
+      const card = document.getElementById('worker-toast-card');
+
+      text.innerText = msg;
+      if (type === 'error') {
+        icon.innerText = '✕';
+        card.className = "bg-rose-900/95 text-white px-4 py-3 rounded-2xl shadow-xl border border-rose-700 flex items-center space-x-3";
+      } else {
+        icon.innerText = '✓';
+        card.className = "bg-slate-900/95 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center space-x-3";
+      }
+
+      toast.classList.remove('-translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('-translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
