@@ -222,7 +222,7 @@
       document.getElementById('loading').classList.add('hidden');
     }
 
-    // GASバックエンドへの安全通信共通関数（Content-Type: text/plain でCORS問題を完全回避）
+    // GASバックエンドへの安全通信共通関数（POST/GETハイブリッド ＆ リダイレクト完全追跡版）
     async function callGasBackend(action, payload = {}) {
       const bodyData = {
         action: action,
@@ -230,16 +230,32 @@
         ...payload
       };
 
-      const res = await fetch(gasBackendUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(bodyData)
-      });
+      try {
+        const res = await fetch(gasBackendUrl, {
+          method: 'POST',
+          mode: 'cors',
+          redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(bodyData)
+        });
 
-      if (!res.ok) {
-        throw new Error(`[HTTP ${res.status}] サーバーとの通信に失敗しました`);
+        if (!res.ok) {
+          throw new Error(`[HTTP ${res.status}] サーバー応答エラー`);
+        }
+        return await res.json();
+      } catch (postErr) {
+        // データ取得アクションの場合は GET 通信へ自動フォールバック
+        if (action === 'getWorkerTaskDetails') {
+          console.warn('POST通信失敗、GETフォールバック実行中...', postErr);
+          const getUrl = `${gasBackendUrl}?action=getWorkerTaskDetails&schedule_id=${encodeURIComponent(currentScheduleId)}`;
+          const getRes = await fetch(getUrl, { mode: 'cors', redirect: 'follow' });
+          if (!getRes.ok) {
+            throw new Error(`[HTTP ${getRes.status}] GET通信失敗 (接続先: ${gasBackendUrl})`);
+          }
+          return await getRes.json();
+        }
+        throw new Error(`${postErr.message} (接続先: ${gasBackendUrl})`);
       }
-      return await res.json();
     }
 
     async function loadTaskData() {
@@ -248,7 +264,7 @@
         const res = await callGasBackend('getWorkerTaskDetails');
         hideLoading();
         if (!res.success) {
-          alert('データ取得エラー: ' + res.message);
+          alert('データ取得エラー: ' + (res.message || 'データが見つかりませんでした'));
           return;
         }
         renderTaskUI(res.data);
