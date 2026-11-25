@@ -222,7 +222,7 @@
       document.getElementById('loading').classList.add('hidden');
     }
 
-    // GASバックエンドへの通信関数（実績コード『GitHub(Index.html)のコード』と完全同一仕様）
+    // GASバックエンドへの通信関数（診断・エラー詳細表示 ＆ 実績仕様）
     async function callGasBackend(action, payload = {}) {
       const bodyData = {
         action: action,
@@ -230,15 +230,30 @@
         ...payload
       };
 
-      const response = await fetch(gasBackendUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain'
-        },
-        body: JSON.stringify(bodyData)
-      });
+      try {
+        const response = await fetch(gasBackendUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: JSON.stringify(bodyData)
+        });
 
-      return await response.json();
+        if (!response.ok) {
+          throw new Error(`[HTTP ${response.status} ${response.statusText}] サーバーが応答しませんでした`);
+        }
+
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch (jsonErr) {
+          throw new Error(`[JSON解析失敗] サーバーからの返答がJSONではありません:\n${text.substring(0, 150)}`);
+        }
+      } catch (netErr) {
+        // 通信遮断の詳細をログとエラーメッセージに集約
+        console.error('Fetch Fatal Error:', netErr);
+        throw new Error(`${netErr.message}\n\n【接続先URL】\n${gasBackendUrl}`);
+      }
     }
 
     async function loadTaskData() {
@@ -253,7 +268,7 @@
         renderTaskUI(res.data);
       } catch (err) {
         hideLoading();
-        alert('通信エラー: ' + err.message);
+        alert('【通信エラー詳細】\n' + err.message);
       }
     }
 
