@@ -222,7 +222,7 @@
       document.getElementById('loading').classList.add('hidden');
     }
 
-    // GASバックエンドへの安全通信共通関数（純粋text/plainプリフライト回避 ＆ エラー診断版）
+    // GASバックエンドへの完全CORS回避・高信頼通信関数
     async function callGasBackend(action, payload = {}) {
       const bodyData = {
         action: action,
@@ -230,33 +230,38 @@
         ...payload
       };
 
+      // 1. 初期データ取得は 100% 確実に開く「GET通信」を最優先実行
+      if (action === 'getWorkerTaskDetails') {
+        const getUrl = `${gasBackendUrl}?action=getWorkerTaskDetails&schedule_id=${encodeURIComponent(currentScheduleId)}&t=${Date.now()}`;
+        try {
+          const res = await fetch(getUrl, {
+            method: 'GET',
+            mode: 'cors',
+            redirect: 'follow',
+            cache: 'no-cache'
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.json();
+        } catch (getErr) {
+          console.warn('GET通信失敗、POSTを試行:', getErr);
+        }
+      }
+
+      // 2. 打刻・ログ・写真送信は text/plain + redirect: follow でPOST実行
       try {
-        // 純粋な text/plain でCORSプリフライト(OPTIONS)を完全回避
         const res = await fetch(gasBackendUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(bodyData)
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(bodyData),
+          redirect: 'follow'
         });
 
         if (!res.ok) {
           throw new Error(`[HTTP ${res.status}] サーバー応答エラー`);
         }
         return await res.json();
-      } catch (postErr) {
-        // データ取得アクションの場合は GET 通信へフォールバック試行
-        if (action === 'getWorkerTaskDetails') {
-          try {
-            const getUrl = `${gasBackendUrl}?action=getWorkerTaskDetails&schedule_id=${encodeURIComponent(currentScheduleId)}`;
-            const getRes = await fetch(getUrl);
-            if (getRes.ok) {
-              return await getRes.json();
-            }
-          } catch (getErr) {
-            console.warn('GETフォールバックも失敗:', getErr);
-          }
-        }
-        // 接続先URLを明示して原因特定を容易にする
-        throw new Error(`${postErr.message}\n\n【接続先URL】\n${gasBackendUrl}`);
+      } catch (err) {
+        throw new Error(`${err.message}\n\n【接続先URL】\n${gasBackendUrl}`);
       }
     }
 
