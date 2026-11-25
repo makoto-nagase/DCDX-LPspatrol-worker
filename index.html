@@ -222,7 +222,7 @@
       document.getElementById('loading').classList.add('hidden');
     }
 
-    // GASバックエンドへの完全CORS回避・高信頼通信関数
+    // GASバックエンドへの通信関数（実績コード『GitHub(Index.html)のコード』と完全同一仕様）
     async function callGasBackend(action, payload = {}) {
       const bodyData = {
         action: action,
@@ -230,39 +230,15 @@
         ...payload
       };
 
-      // 1. 初期データ取得は 100% 確実に開く「GET通信」を最優先実行
-      if (action === 'getWorkerTaskDetails') {
-        const getUrl = `${gasBackendUrl}?action=getWorkerTaskDetails&schedule_id=${encodeURIComponent(currentScheduleId)}&t=${Date.now()}`;
-        try {
-          const res = await fetch(getUrl, {
-            method: 'GET',
-            mode: 'cors',
-            redirect: 'follow',
-            cache: 'no-cache'
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return await res.json();
-        } catch (getErr) {
-          console.warn('GET通信失敗、POSTを試行:', getErr);
-        }
-      }
+      const response = await fetch(gasBackendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify(bodyData)
+      });
 
-      // 2. 打刻・ログ・写真送信は text/plain + redirect: follow でPOST実行
-      try {
-        const res = await fetch(gasBackendUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(bodyData),
-          redirect: 'follow'
-        });
-
-        if (!res.ok) {
-          throw new Error(`[HTTP ${res.status}] サーバー応答エラー`);
-        }
-        return await res.json();
-      } catch (err) {
-        throw new Error(`${err.message}\n\n【接続先URL】\n${gasBackendUrl}`);
-      }
+      return await response.json();
     }
 
     async function loadTaskData() {
